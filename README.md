@@ -1,499 +1,539 @@
-# 🛡️ FreshGuard AI
-### Stale-Answer Detector for AI Applications
+# FreshGuard AI — Stale-Answer Detector for AI Applications
 
-**Detect outdated AI-generated answers. Verify claims against trusted knowledge sources. Improve AI reliability.**
+<p align="center">
+  <strong>Detect outdated, potentially incorrect, and conflicting AI answers before they reach users.</strong>
+</p>
 
-FreshGuard AI is a lightweight, AI reliability monitoring MVP designed to identify outdated, contradictory, and potentially unreliable information in AI-generated answers.
+<p align="center">
+  An AI reliability and knowledge freshness monitoring system built to help AI applications identify answers that may no longer reflect the latest available information.
+</p>
 
-It analyzes factual claims, retrieves relevant evidence from knowledge sources, compares numerical values and software versions, and generates explainable freshness assessments.
-
-Built as a single-file Python application for rapid prototyping and hackathon demonstrations, FreshGuard AI works without paid APIs, external AI services, or databases.
+<p align="center">
+  <img src="https://img.shields.io/badge/Project-Hackathon%20MVP-blueviolet" alt="Hackathon MVP">
+  <img src="https://img.shields.io/badge/Python-3.12-blue" alt="Python">
+  <img src="https://img.shields.io/badge/Status-Active-success" alt="Status">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+</p>
 
 ---
 
-## ✨ Key Features
+## Overview
 
-### 1. Answer Analyzer
-- Analyze AI-generated answers against knowledge sources.
-- Extract individual factual claims.
-- Classify claims into meaningful categories.
-- Identify time-sensitive information.
-- Retrieve relevant supporting evidence.
-- Detect numerical and version contradictions.
-- Generate explainable analysis reports.
+AI applications can generate answers that sound confident but rely on outdated documentation, old pricing information, deprecated API versions, or previously valid company policies.
+
+This creates a serious reliability problem: an answer can be factually correct based on historical information while being incorrect today.
+
+**FreshGuard AI** is designed to address this problem.
+
+It analyzes AI-generated answers against available knowledge sources and identifies potential freshness risks, outdated claims, unsupported information, and possible contradictions.
+
+Instead of treating every generated answer as equally reliable, FreshGuard AI provides a structured assessment that helps developers understand whether an answer should be trusted, reviewed, or investigated.
+
+### The Problem
+
+Consider an AI customer-support assistant that responds:
+
+> "Our Premium subscription costs $99 per month."
+
+However, the company's latest pricing documentation states that the Premium subscription now costs $149 per month.
+
+A traditional AI application may still return the outdated price because its underlying knowledge has not been updated.
+
+FreshGuard AI aims to identify this discrepancy before the answer is delivered to the end user.
+
+### The Solution
+
+FreshGuard AI introduces a knowledge-aware answer validation workflow:
+
+1. Collect relevant knowledge sources.
+2. Extract and organize available information.
+3. Analyze an AI-generated answer.
+4. Retrieve supporting knowledge.
+5. Evaluate temporal and factual consistency.
+6. Calculate a freshness score.
+7. Highlight potential risks and supporting evidence.
+
+---
+
+## Key Features
+
+### 1. AI Answer Freshness Analysis
+
+Analyze generated answers and identify potentially outdated information.
+
+- Sentence-level claim analysis.
+- Temporal risk identification.
+- Potentially outdated claims.
+- Unsupported information detection.
+- Evidence-based answer assessment.
+- Structured analysis results.
 
 ### 2. Knowledge Source Management
-Supports multiple knowledge source formats:
+
+Provide reference knowledge that can be used to evaluate generated answers.
+
+Supported source types depend on the ingestion implementation:
 
 - PDF documents
 - DOCX documents
-- TXT documents
-- Website URLs
+- TXT files
+- Web URLs
 
-Additional capabilities:
-- Automatic text extraction.
-- Text normalization and chunking.
-- SHA-256 content hashing.
-- In-memory source indexing.
-- Source metadata management.
-- Source preview and reprocessing.
-- Source removal.
+### 3. Knowledge Retrieval
 
-### 3. Hybrid Staleness Detection Engine
+Retrieve relevant information from available knowledge sources to compare against the generated answer.
 
-FreshGuard uses deterministic, rule-based detection combined with lightweight information retrieval.
+The system is designed around:
 
-Detection capabilities include:
+- Text normalization.
+- Content processing.
+- Document chunking.
+- Similarity-based retrieval.
+- Supporting evidence extraction.
 
-- Price and numerical comparisons.
-- Currency-aware value extraction.
-- Software version comparisons.
-- Date extraction and comparison.
-- Temporal sensitivity analysis.
-- Keyword-based contradiction signals.
-- Evidence relevance scoring.
+### 4. Contradiction Detection
 
-### 4. Freshness Scoring
+Identify potential differences between answer claims and retrieved knowledge.
 
-The application calculates a freshness score using three primary factors:
+Examples include:
 
-**Freshness Score Formula**
+- Outdated subscription pricing.
+- Deprecated API versions.
+- Changed company policies.
+- Different numeric values.
+- Conflicting reference information.
 
-Freshness Score =
+### 5. Freshness Scoring
 
-100 − (0.35 × Temporal Risk + 0.40 × Contradiction Severity + 0.25 × Evidence Age Risk)
+FreshGuard AI uses a weighted scoring approach to estimate answer freshness.
 
-All scoring inputs are normalized between 0 and 100.
+The scoring model considers:
 
-| Score | Classification |
-|---|---|
-| 80–100 | FRESH |
-| 60–79 | REVIEW |
-| 30–59 | POTENTIALLY STALE |
-| 0–29 | HIGH STALE RISK |
+- Temporal risk.
+- Contradiction severity.
+- Evidence age risk.
 
-Additional detection statuses:
+The conceptual formula is:
 
-- **STALE:** Evidence contradicts an answer.
-- **UNVERIFIED:** Insufficient supporting evidence.
-- **CONFLICT:** Retrieved sources contain conflicting information.
+\[
+FreshnessScore = 100 - (0.35T + 0.40C + 0.25A)
+\]
 
-Missing evidence is not automatically treated as proof of stale information.
+Where:
 
-### 5. Evidence Retrieval
+- \(T\) = Temporal risk
+- \(C\) = Contradiction severity
+- \(A\) = Evidence age risk
 
-FreshGuard implements lightweight in-memory evidence retrieval.
+The result is a score between 0 and 100.
 
-Retrieval priority:
-
-1. TF-IDF vectorization using Scikit-learn.
-2. Token-overlap similarity fallback.
-
-Relevant evidence is displayed alongside the original claim, including its source name and retrieval relevance score.
-
-No external vector database is required.
+**Important:** This is a heuristic assessment, not a mathematically guaranteed probability that an answer is correct.
 
 ### 6. Knowledge Update Simulation
 
-A dedicated hackathon demonstration feature.
+Simulate changes in reference knowledge and inspect whether previously analyzed answers may be affected.
 
-Simulate changes between old and updated knowledge sources.
+Example:
 
-Workflow:
+- Previous Premium price: $99/month.
+- Updated Premium price: $149/month.
+- Previously analyzed answers can be reviewed for potentially outdated information.
 
-OLD SOURCE → NEW SOURCE → CHANGE DETECTION → CLAIM REVALIDATION → STALE ALERT
+### 7. Detection History
 
-The simulation:
-- Compares SHA-256 content hashes.
-- Identifies changed source content.
-- Scans previously analyzed answers.
-- Identifies affected price and API version claims.
-- Displays potential stale-answer alerts.
+Keep track of analyzed answers during the application session.
 
-### 7. Analytics Dashboard
+Review previous results and investigate answers that may require attention.
 
-- Total answers analyzed.
-- Fresh answers.
-- Stale and conflicting answers.
-- Unverified answers.
-- Average freshness score.
-- Freshness distribution.
-- Detection trends.
-- Claim category distribution.
+### 8. Analytics Dashboard
 
-All dashboard metrics are calculated from actual application session data.
+Present an overview of answer analysis and detection activity through visual summaries and charts, where supported by the application.
 
 ---
 
-## 🖥️ Application Dashboard
+## Application Modules
 
-FreshGuard AI features a modern dark-themed dashboard with a premium blue and violet visual identity.
-
-Main sections:
-
-| Section | Description |
-|---|---|
-| Overview | Application metrics and recent detections |
-| Answer Analyzer | Analyze AI-generated answers |
-| Knowledge Sources | Upload and manage source documents |
-| Demo Lab | Execute hackathon demonstration scenarios |
-| Knowledge Update | Simulate source changes |
-| Detection History | Review previous analyses |
-| Analytics | Visualize detection statistics |
-| Settings | Configure scoring thresholds |
-
----
-
-## 🧠 Detection Examples
-
-### Scenario 1: Stale Answer
-
-**Question:**
-
-What is the current Premium plan price?
-
-**AI-generated answer:**
-
-Our Premium plan costs $99 per month.
-
-**Latest knowledge source:**
-
-Premium Plan: $149/month.
-
-**Expected outcome:** STALE
-
-The system identifies a numerical contradiction between the generated answer and retrieved evidence.
-
-### Scenario 2: Fresh Answer
-
-**AI-generated answer:**
-
-Our Premium plan costs $149 per month.
-
-**Knowledge source:**
-
-Premium Plan: $149/month.
-
-**Expected outcome:** FRESH, provided the evidence and freshness score satisfy the configured thresholds.
-
-### Scenario 3: Unverified Answer
-
-**AI-generated answer:**
-
-Our Premium plan includes unlimited AI requests.
-
-**Knowledge sources:**
-
-No relevant supporting evidence.
-
-**Expected outcome:** UNVERIFIED
-
-The system does not automatically assume that unsupported claims are false.
-
-### Scenario 4: Outdated Software Version
-
-**AI-generated answer:**
-
-The latest API version is v2.
-
-**Latest documentation:**
-
-Current API version is v3.
-
-**Expected outcome:** STALE
-
-The version comparison identifies the older version referenced in the answer.
-
-### Scenario 5: Conflicting Knowledge
-
-Two active knowledge sources contain different Premium plan prices.
-
-**Expected behavior:** Identify inconsistent evidence and flag the result for further investigation.
-
----
-
-## 🏗️ Architecture
-
-FreshGuard AI uses a lightweight, single-file architecture.
+The project is organized into separate Python modules.
 
 ```text
-freshguard-ai/
+freshguard/
 │
-├── freshguard_ai.py
+├── main.py
+│   └── Main application entry point
+│
+├── engine.py
+│   └── Freshness analysis and detection logic
+│
+├── storage.py
+│   └── Data storage and management
+│
+├── static/
+│   └── Static frontend assets
+│
+├── .venv/
+│   └── Python virtual environment
+│
+├── .gitignore
 │
 └── README.md
 ```
 
-The Python application internally separates its responsibilities into logical modules:
+### Module Responsibilities
 
-```text
-FRESHGUARD AI
-│
-├── Streamlit Dashboard
-│   ├── Overview
-│   ├── Answer Analyzer
-│   ├── Knowledge Sources
-│   ├── Demo Lab
-│   ├── Knowledge Update
-│   └── Analytics
-│
-├── Detection Engine
-│   ├── Claim Extraction
-│   ├── Claim Classification
-│   ├── Temporal Analysis
-│   ├── Evidence Retrieval
-│   ├── Contradiction Detection
-│   ├── Freshness Scoring
-│   └── Explanation Generation
-│
-├── Document Ingestion
-│   ├── PDF Parser
-│   ├── DOCX Parser
-│   ├── TXT Parser
-│   ├── Website Parser
-│   └── Text Chunking
-│
-└── In-Memory Storage
-    ├── Knowledge Sources
-    ├── Extracted Claims
-    ├── Analysis History
-    └── Analytics
-```
-
-All functionality is implemented within `freshguard_ai.py` for easy execution and hackathon deployment.
+| Module | Responsibility |
+|---|---|
+| `main.py` | Application interface and workflow |
+| `engine.py` | Claim analysis, retrieval, scoring, and detection |
+| `storage.py` | Knowledge and application data management |
+| `static/` | Frontend styling and static resources |
 
 ---
 
-## ⚙️ Technology Stack
+## Technology Stack
 
 | Technology | Purpose |
 |---|---|
-| Python 3.12 | Core application |
-| Streamlit | Interactive dashboard |
-| Scikit-learn | TF-IDF evidence retrieval |
-| PyMuPDF | PDF text extraction |
-| python-docx | DOCX document extraction |
-| BeautifulSoup | Website content extraction |
-| HTTPX | Website ingestion |
-| Pandas | Analytics data processing |
-| Plotly | Interactive visualizations |
-| Regex | Claim, date, number and version extraction |
-| SHA-256 | Source content hashing |
+| Python | Core application development |
+| Streamlit / application UI | User interface, if used by the current implementation |
+| Scikit-learn | Text similarity and retrieval, if enabled |
+| Pandas | Data processing |
+| PyMuPDF | PDF document processing |
+| python-docx | DOCX document processing |
+| BeautifulSoup | Web content extraction |
+| HTTPX | HTTP requests |
+| Plotly | Interactive analytics visualizations, if enabled |
+
+The actual runtime dependencies are defined by the project's installed packages and implementation.
 
 ---
 
-## 🚀 Installation and Setup
+## Installation and Setup
 
 ### Prerequisites
 
-- Windows 10/11, Linux, or macOS
-- Python 3.12
-- pip package manager
-- Internet connection for installing dependencies and website ingestion
+- Windows 10/11, Linux, or macOS.
+- Python 3.10 or newer.
+- Git.
+- pip.
 
-### Step 1: Clone the Repository
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Sheikh-Ayyan-Iftikhar/freshguard-ai.git
+git clone https://github.com/YOUR_USERNAME/freshguard.git
+```
 
-cd freshguard-ai
+```bash
+cd freshguard
 ```
 
 Replace `YOUR_USERNAME` with your GitHub username.
 
-### Step 2: Create a Virtual Environment
+### 2. Create a Virtual Environment
 
 **Windows PowerShell:**
 
 ```powershell
 py -3.12 -m venv .venv
-
-.\.venv\Scripts\Activate.ps1
 ```
 
-If PowerShell blocks script execution:
+### 3. Activate the Environment
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-
 .\.venv\Scripts\Activate.ps1
 ```
 
-### Step 3: Install Dependencies
+If PowerShell blocks script execution, run:
 
-```bash
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Then activate the environment again.
+
+### 4. Install Dependencies
+
+Install the dependencies required by the project.
+
+If a `requirements.txt` file is available:
+
+```powershell
+pip install -r requirements.txt
+```
+
+Otherwise, install the packages required by the current implementation:
+
+```powershell
 pip install streamlit pandas scikit-learn pymupdf python-docx beautifulsoup4 httpx plotly
 ```
 
-### Step 4: Run FreshGuard AI
+### 5. Run the Application
 
-```bash
-streamlit run freshguard_ai.py
+If the project uses Streamlit:
+
+```powershell
+streamlit run main.py
 ```
 
-### Step 5: Open the Application
-
-```text
-http://localhost:8501
-```
-
-That's it! FreshGuard AI is ready to use.
+Otherwise, use the entry-point command specified by the application's implementation.
 
 ---
 
-## 🎯 Hackathon Demonstration Guide
+## How to Use FreshGuard AI
 
-For the best demonstration experience:
+### Step 1 — Launch the Application
 
-**Step 1 — Launch the Application**
+Start FreshGuard AI using the appropriate application command.
 
-Start FreshGuard AI and open the dashboard.
+### Step 2 — Add Knowledge Sources
 
-**Step 2 — Load Demo Data**
+Upload supported reference documents or provide a URL if URL ingestion is enabled.
 
-Navigate to Demo Lab and click:
+These sources act as the reference knowledge for answer evaluation.
 
-`Load / reset demo knowledge`
+### Step 3 — Submit an AI-Generated Answer
 
-This loads sample pricing, company policy, product documentation, and API documentation.
+Provide the answer that you want to inspect.
 
-**Step 3 — Demonstrate Stale Detection**
-
-Execute the stale pricing scenario.
-
-Show the difference:
+Example:
 
 ```text
-AI ANSWER             CURRENT SOURCE
-
-$99/month      →     $149/month
-
-       STALE DETECTED
+Our Premium subscription costs $99 per month
+and includes unlimited API requests.
 ```
 
-**Step 4 — Demonstrate Fresh Detection**
+### Step 4 — Analyze the Answer
 
-Run the fresh pricing scenario using $149/month.
+Run the freshness analysis.
 
-**Step 5 — Demonstrate Unverified Claims**
+The system evaluates available evidence and identifies potential inconsistencies.
 
-Analyze the unlimited AI requests claim.
+### Step 5 — Review the Results
 
-**Step 6 — Demonstrate Version Detection**
+Inspect:
 
-Compare API v2 with the documented API v3.
-
-**Step 7 — Demonstrate Knowledge Updates**
-
-Navigate to Knowledge Update and run the simulation.
-
-Show how changes in source content can affect previously analyzed answers.
-
-**Step 8 — Explore Analytics**
-
-Show the detection history and analytics dashboard.
-
----
-
-## 📊 Evaluation and Reliability
-
-FreshGuard AI is designed to make AI answer validation explainable.
-
-Each analysis can expose:
-
-- Original factual claim.
-- Claim category.
-- Temporal sensitivity.
 - Freshness score.
 - Detection status.
-- Retrieved evidence.
-- Source references.
-- Contradiction explanation.
-- Recommended corrective action.
+- Potentially outdated claims.
+- Contradiction indicators.
+- Supporting knowledge.
+- Recommended review actions.
 
-**Important:** No benchmark precision, recall, F1 score, or false-positive rate is claimed in this MVP. A formally evaluated test dataset and automated evaluation suite have not yet been implemented.
+### Step 6 — Simulate a Knowledge Update
 
----
-
-## 🔒 Data Privacy and Storage
-
-FreshGuard AI follows a database-free architecture.
-
-- No PostgreSQL.
-- No MySQL.
-- No MongoDB.
-- No SQLite.
-- No Redis.
-- No vector database.
-- No mandatory cloud infrastructure.
-- No authentication or registration.
-
-Application data is maintained in Streamlit session state.
-
-**Important:** Uploaded documents and analysis history are temporary. They are not guaranteed to persist across sessions or application restarts.
+Update or simulate a change in reference information and investigate whether previously analyzed answers may now be outdated.
 
 ---
 
-## ⚠️ Current MVP Limitations
+## Example Detection Scenarios
 
-This is a hackathon MVP, not an enterprise-grade production monitoring platform.
+The following scenarios illustrate the types of problems FreshGuard AI is designed to investigate. They are illustrative examples, not benchmark results.
 
-Current limitations include:
-
-1. Claim extraction is primarily deterministic and sentence-based.
-2. Semantic retrieval uses TF-IDF rather than transformer embeddings.
-3. Contradiction detection relies on numerical, version, date, and keyword-based heuristics.
-4. Source age is a weak freshness signal and does not establish whether information is correct.
-5. Website ingestion is intended for accessible public pages, not authenticated websites.
-6. The knowledge update simulator currently demonstrates source changes using predefined sample content.
-7. Data is temporary and session-based.
-8. The optional LLM environment configuration is reserved for future integration; external LLM calls are not currently implemented.
-9. Automated benchmark evaluation and REST API endpoints are not included in this single-file edition.
+| Scenario | Answer | Reference Knowledge | Expected Investigation |
+|---|---|---|---|
+| Outdated Pricing | Premium costs $99 | Premium costs $149 | Potentially stale |
+| Current Pricing | Premium costs $149 | Premium costs $149 | Supported by evidence |
+| Deprecated API | API v2 is current | API v3 is current | Version inconsistency |
+| Unsupported Claim | Unlimited requests included | 5,000 requests included | Unsupported or contradictory claim |
+| Knowledge Conflict | Premium costs $149 | Another source says $199 | Conflicting evidence |
 
 ---
 
-## 🔮 Future Improvements
+## Freshness Status Interpretation
 
-Potential future development:
+The following score bands describe the intended interpretation of the freshness score. Additional detection statuses may be produced by the engine.
 
-- OpenAI-compatible LLM integration.
-- Sentence Transformers for semantic retrieval.
-- Claim-level revalidation when knowledge sources change.
-- Automated stale-answer monitoring.
-- Real-time AI response interception.
-- REST API integration for external AI applications.
-- Automated regression testing.
-- Measured precision, recall, and F1 evaluation.
-- Persistent source version management.
-- Advanced semantic contradiction detection.
-- Production deployment architecture.
+| Score | Status | Interpretation |
+|---|---|---|
+| 80–100 | FRESH | Stronger freshness indicators |
+| 60–79 | REVIEW | Manual review recommended |
+| 30–59 | POTENTIALLY STALE | Significant freshness concerns |
+| 0–29 | HIGH STALE RISK | High priority for investigation |
 
----
+Other possible detection outcomes include:
 
-## 💡 Why FreshGuard AI?
+- **UNVERIFIED:** Available evidence is insufficient to verify a claim.
+- **STALE:** A claim appears inconsistent with newer knowledge.
+- **CONFLICT:** Available reference sources disagree.
 
-AI systems can generate convincing answers using outdated information.
-
-A response may be grammatically correct and sound confident while containing an obsolete price, deprecated software version, outdated policy, or incorrect specification.
-
-FreshGuard AI addresses this reliability problem by introducing an explainable verification layer between AI-generated answers and trusted knowledge sources.
-
-**The goal is simple: Don't just generate answers. Verify that they are still correct.**
+A high freshness score does not guarantee factual correctness. Likewise, a low score does not automatically prove that an answer is false.
 
 ---
 
-## 🏆 Project Information
+## Architecture
+
+```text
+          AI-Generated Answer
+                   |
+                   v
+          Answer Submission
+                   |
+                   v
+          Claim Extraction
+                   |
+                   v
+          Temporal Analysis
+                   |
+                   v
+          Knowledge Retrieval
+                   |
+                   v
+        Evidence Comparison
+                   |
+                   v
+       Contradiction Assessment
+                   |
+                   v
+          Freshness Scoring
+                   |
+                   v
+          Detection Results
+                   |
+          +--------+--------+
+          |                 |
+          v                 v
+     Risk Analysis     Evidence Review
+          |                 |
+          +--------+--------+
+                   |
+                   v
+          Developer Review
+```
+
+---
+
+## Design Principles
+
+FreshGuard AI is developed around several core principles:
+
+**1. Knowledge-Aware Validation**
+
+Answers should be evaluated against available reference knowledge rather than relying solely on their generated wording.
+
+**2. Explainable Results**
+
+The system should help developers understand why an answer was flagged, rather than simply returning a score.
+
+**3. Lightweight Architecture**
+
+The MVP focuses on a straightforward Python-based implementation without requiring a complex enterprise infrastructure.
+
+**4. Practical Demonstration**
+
+The project includes demonstration scenarios that illustrate common freshness and consistency problems.
+
+**5. Human Review**
+
+Automated detection is intended to support human decision-making, not replace it.
+
+---
+
+## Current MVP Scope
+
+FreshGuard AI is an evolving hackathon MVP.
+
+Current implementation capabilities depend on the code available in the repository.
+
+The project is designed to focus on:
+
+- Knowledge ingestion.
+- Answer analysis.
+- Retrieval-based evidence comparison.
+- Heuristic freshness assessment.
+- Potential contradiction detection.
+- Knowledge update simulation.
+- Detection history and analytics.
+
+### Current Limitations
+
+- Detection relies on heuristics and available reference information.
+- Similarity-based retrieval does not guarantee semantic understanding.
+- Numeric and version comparisons may require additional validation.
+- Conflicting sources may require human investigation.
+- A freshness score should not be interpreted as a calibrated confidence probability.
+- General-purpose automatic knowledge monitoring is outside the scope of the basic MVP.
+- External LLM integration should not be considered active unless explicitly implemented and configured.
+
+---
+
+## Future Roadmap
+
+Potential improvements include:
+
+- [ ] Advanced semantic claim extraction.
+- [ ] More robust temporal reasoning.
+- [ ] Improved contradiction detection.
+- [ ] Source reliability and authority scoring.
+- [ ] Automatic knowledge change monitoring.
+- [ ] LLM-powered claim verification.
+- [ ] REST API integration.
+- [ ] Integration with LangChain and other AI application frameworks.
+- [ ] Integration with RAG pipelines.
+- [ ] Persistent knowledge storage.
+- [ ] Automated evaluation and benchmark datasets.
+- [ ] Production-ready deployment and monitoring.
+
+---
+
+## Security and Data Handling
+
+The MVP should be treated as a development and demonstration environment.
+
+Before production deployment, consider implementing:
+
+- Secure document handling.
+- URL ingestion restrictions.
+- Input validation.
+- Authentication and authorization.
+- Sensitive information protection.
+- Secure API key management.
+- Persistent storage security.
+- Logging and monitoring.
+
+Do not upload confidential documents or production secrets into an environment that has not been reviewed for security.
+
+---
+
+## Contributing
+
+Contributions, suggestions, and technical feedback are welcome.
+
+To contribute:
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Implement your changes.
+4. Test the application.
+5. Submit a pull request.
+
+```bash
+git checkout -b feature/your-feature
+git add .
+git commit -m "Add: your feature"
+git push origin feature/your-feature
+```
+
+---
+
+## License
+
+This project is intended to be released under the MIT License.
+
+Add a `LICENSE` file to the repository before claiming that the project has been formally distributed under that license.
+
+---
+
+## Project Information
 
 **Project:** FreshGuard AI  
-**Category:** Artificial Intelligence / AI Reliability  
+**Category:** AI Reliability / AI Infrastructure / Developer Tools  
 **Type:** Hackathon MVP  
 **Primary Language:** Python  
-**Interface:** Streamlit  
-**Architecture:** Single-file, database-free application  
-**Deployment:** Local development
+**Focus:** Detecting stale, unsupported, and potentially conflicting AI-generated answers.
 
 ---
 
-### Built for a more reliable AI ecosystem. 🛡️
-
-**FreshGuard AI — Detect Staleness. Verify Evidence. Trust Better.**
+<p align="center">
+  <strong>FreshGuard AI</strong>
+  <br>
+  Making AI answers more reliable, one claim at a time.
+</p>
