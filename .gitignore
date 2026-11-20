@@ -1,0 +1,44 @@
+@"
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build Files
+build/
+dist/
+*.egg-info/
+
+# Temporary Files
+*.tmp
+*.bak
+"@ | Set-Content -Encoding utf8 .gitignore

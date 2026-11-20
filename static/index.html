@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreshGuard AI</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+ body{font-family:Inter,system-ui,sans-serif;background:#070d1c;color:#e2e8f0}
+ .bgglow{background:radial-gradient(900px 500px at 15% -10%,rgba(99,102,241,.25),transparent),radial-gradient(800px 500px at 95% 10%,rgba(59,130,246,.18),transparent)}
+ .card{background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.13);border-radius:1.1rem;backdrop-filter:blur(8px)}
+ .btn{padding:.55rem 1rem;border-radius:.75rem;font-weight:600;font-size:.85rem;transition:.2s;cursor:pointer}
+ .btn-p{background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff}.btn-p:hover{filter:brightness(1.15);transform:translateY(-1px)}
+ .btn-g{background:rgba(255,255,255,.07);border:1px solid rgba(148,163,184,.2)}.btn-g:hover{background:rgba(255,255,255,.13)}
+ .inp{width:100%;background:rgba(2,6,23,.6);border:1px solid rgba(148,163,184,.2);border-radius:.75rem;padding:.65rem .85rem;color:#e2e8f0;font-size:.9rem;outline:none}
+ .inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.25)}
+ .fade{animation:fade .45s ease both}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+ .nav a{display:flex;gap:.7rem;align-items:center;padding:.6rem .9rem;border-radius:.7rem;color:#94a3b8;font-size:.9rem;font-weight:500}
+ .nav a:hover{background:rgba(255,255,255,.06);color:#fff}.nav a.on{background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(124,58,237,.25));color:#fff}
+ .ring{width:130px;height:130px;border-radius:50%;display:grid;place-items:center}.ring>div{width:104px;height:104px;border-radius:50%;background:#0b1224;display:grid;place-items:center}
+ .step{opacity:.15;transition:.6s}.step.show{opacity:1}
+ pre{white-space:pre-wrap;word-break:break-word}
+</style>
+</head>
+<body class="bgglow min-h-screen">
+<div class="flex min-h-screen">
+ <aside id="side" class="hidden w-64 shrink-0 flex-col gap-1 p-4 border-r border-slate-800/80 sticky top-0 h-screen">
+  <a href="#/home" class="flex items-center gap-2 px-2 py-3 mb-3"><span class="text-2xl">🛡️</span><span class="font-extrabold text-lg">Fresh<span class="text-indigo-400">Guard</span> AI</span></a>
+  <nav class="nav flex flex-col gap-1">
+   <a href="#/dashboard" data-r="dashboard">📊 Overview</a><a href="#/analyzer" data-r="analyzer">🔎 Answer Analyzer</a>
+   <a href="#/sources" data-r="sources">📚 Knowledge Sources</a><a href="#/history" data-r="history">🕘 Detection History</a>
+   <a href="#/analytics" data-r="analytics">📈 Analytics</a><a href="#/simulate" data-r="simulate">⚡ Knowledge Update</a>
+   <a href="#/settings" data-r="settings">⚙️ Settings</a>
+  </nav>
+  <div class="mt-auto card p-3 text-xs text-slate-400">⚠️ Demo state is <b>temporary</b> (in-memory). Restarting the server clears everything.</div>
+ </aside>
+ <main id="view" class="flex-1 min-w-0"></main>
+</div>
+<div id="toast" class="fixed bottom-5 right-5 z-50"></div>
+<div id="modal" class="fixed inset-0 z-40 hidden bg-black/70 p-6 overflow-auto" onclick="if(event.target===this)closeModal()"><div id="mbody" class="card bg-slate-900 max-w-4xl mx-auto p-6"></div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(p,o={}){const r=await fetch(p,o);let d=null;try{d=await r.json()}catch{}
+ if(!r.ok){const m=d&&(typeof d.detail==="string"?d.detail:JSON.stringify(d.detail))||r.statusText;throw new Error(m)}return d}
+const post=(p,b)=>api(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})});
+function toast(m,err){const t=document.createElement("div");t.className=`fade card px-4 py-3 mb-2 text-sm ${err?"border-red-500/50 text-red-300":"border-emerald-500/40 text-emerald-300"}`;t.textContent=m;$("#toast").appendChild(t);setTimeout(()=>t.remove(),4000)}
+const SC={FRESH:"bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",REVIEW:"bg-amber-500/15 text-amber-300 border border-amber-500/30",STALE:"bg-red-500/15 text-red-300 border border-red-500/30",CONFLICT:"bg-orange-500/15 text-orange-300 border border-orange-500/30",UNVERIFIED:"bg-sky-500/15 text-sky-300 border border-sky-500/30","POTENTIALLY STALE":"bg-orange-500/15 text-orange-300 border border-orange-500/30","HIGH STALE RISK":"bg-red-500/15 text-red-300 border border-red-500/30","N/A":"bg-slate-500/15 text-slate-300 border border-slate-500/30"};
+const badge=s=>`<span class="px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${SC[s]||SC["N/A"]}">${esc(s)}</span>`;
+const col=s=>s==null?"#64748b":s>=80?"#10b981":s>=60?"#f59e0b":s>=30?"#fb923c":"#ef4444";
+const fmt=s=>s==null?"—":s;
+const when=t=>new Date(t).toLocaleString();
+let charts=[];const mk=(id,cfg)=>{charts.push(new Chart($(id),cfg))};
+Chart.defaults.color="#94a3b8";Chart.defaults.borderColor="rgba(148,163,184,.12)";
+const PAL=["#3b82f6","#8b5cf6","#10b981","#f59e0b","#ef4444","#06b6d4","#ec4899","#84cc16","#f97316","#64748b"];
+function openModal(h){$("#mbody").innerHTML=h;$("#modal").classList.remove("hidden")}function closeModal(){$("#modal").classList.add("hidden")}
+const wrap=h=>`<div class="p-6 lg:p-10 fade max-w-6xl mx-auto">${h}</div>`;
+const head=(t,s,r="")=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-6"><div><h1 class="text-3xl font-extrabold">${t}</h1><p class="text-slate-400 mt-1">${s}</p></div><div class="flex gap-2 flex-wrap">${r}</div></div>`;
+
+/* ───── actions ───── */
+async function seedDemo(go){try{const r=await post("/api/v1/demo/seed");toast(r.message);if(go!==false)route()}catch(e){toast(e.message,1)}}
+async function resetDemo(){if(!confirm("Clear all sources and analyses?"))return;try{await post("/api/v1/demo/reset");toast("State cleared");route()}catch(e){toast(e.message,1)}}
+
+/* ───── report renderer ───── */
+function bar(l,v,c){return `<div class="mb-1.5"><div class="flex justify-between text-[11px] text-slate-400"><span>${l}</span><span>${v}</span></div><div class="h-1.5 rounded bg-slate-800"><div class="h-1.5 rounded" style="width:${v}%;background:${c}"></div></div></div>`}
+function claimCard(c){
+ const cmp=(c.old_value||c.current_value)?`<div class="grid md:grid-cols-2 gap-3 my-3">
+  <div class="rounded-xl p-3 bg-red-500/10 border border-red-500/25"><div class="text-[10px] font-bold tracking-widest text-red-300">AI ANSWER SAYS</div><div class="text-lg font-bold mt-1 break-words">${esc(c.old_value??"—")}</div></div>
+  <div class="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/25"><div class="text-[10px] font-bold tracking-widest text-emerald-300">CURRENT SOURCE SAYS</div><div class="text-lg font-bold mt-1 break-words">${esc(c.current_value??"—")}</div></div></div>`:"";
+ const ev=c.evidence.map(e=>`<div class="text-xs rounded-lg p-2.5 bg-slate-900/70 border border-slate-700/60 mb-1.5"><div class="flex justify-between gap-2 mb-1"><span class="font-semibold text-indigo-300">📄 ${esc(e.source_name)}</span><span class="text-slate-500">${e.current?"current":"superseded"} · sim ${e.similarity}</span></div><span class="text-slate-300">${esc(e.text)}</span></div>`).join("");
+ return `<div class="card p-4 mb-3"><div class="flex flex-wrap items-start justify-between gap-2"><div class="font-semibold">${esc(c.text)}</div><div class="flex gap-2 items-center">${badge(c.status)}<span class="font-extrabold" style="color:${col(c.score)}">${fmt(c.score)}</span></div></div>
+ <div class="flex flex-wrap gap-2 mt-2 text-[11px]"><span class="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300">${esc(c.category)}</span><span class="px-2 py-0.5 rounded bg-slate-700/50">Temporal sensitivity: ${c.sensitivity}</span>${c.markers.map(m=>`<span class="px-2 py-0.5 rounded bg-slate-700/50">“${esc(m)}”</span>`).join("")}</div>
+ ${cmp}<div class="grid md:grid-cols-2 gap-4 mt-2"><div>${c.score!=null?bar("Temporal risk",c.temporal_risk,"#8b5cf6")+bar("Contradiction severity",c.contradiction_severity,"#ef4444")+bar("Evidence age risk",c.evidence_age_risk,"#f59e0b"):'<div class="text-xs text-slate-400">No score: insufficient evidence (missing evidence ≠ stale).</div>'}</div>
+ <div class="text-sm text-slate-300"><p>${esc(c.explanation)}</p><p class="mt-2 text-emerald-300">➜ ${esc(c.action)}</p></div></div>
+ ${ev?`<div class="mt-3"><div class="text-[11px] font-bold tracking-widest text-slate-500 mb-1">EVIDENCE</div>${ev}</div>`:""}</div>`}
+function report(r){return `<div class="card p-5 mb-4 flex flex-wrap items-center gap-6">
+ <div class="ring" style="background:conic-gradient(${col(r.overall_score)} ${r.overall_score||0}%,#1e293b 0)"><div><div class="text-center"><div class="text-3xl font-extrabold" style="color:${col(r.overall_score)}">${fmt(r.overall_score)}</div><div class="text-[10px] text-slate-400">FRESHNESS</div></div></div></div>
+ <div class="flex-1 min-w-[240px]"><div class="flex flex-wrap gap-2 mb-2">${badge(r.status)}${badge(r.band)}<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-700/60">Risk: ${r.risk_level}</span><span class="px-2.5 py-1 rounded-full text-xs bg-slate-700/60">Coverage ${r.coverage}%</span></div>
+ <p class="text-slate-300 text-sm">${esc(r.summary)}</p><p class="text-emerald-300 text-sm mt-2">➜ ${esc(r.recommended_action)}</p>${r.notes.map(n=>`<p class="text-amber-300 text-xs mt-1">⚠ ${esc(n)}</p>`).join("")}<p class="text-[11px] text-slate-500 mt-2">${r.llm_used?"Summary polished by optional LLM":"Deterministic engine (no LLM)"} · ${when(r.created_at)}</p></div></div>${r.claims.map(claimCard).join("")}`}
+
+/* ───── views ───── */
+async function home(){$("#view").innerHTML=`<div class="max-w-6xl mx-auto px-6 py-10 fade">
+ <div class="flex justify-between items-center mb-16"><div class="font-extrabold text-xl">🛡️ Fresh<span class="text-indigo-400">Guard</span> AI</div><a href="#/dashboard" class="btn btn-g">Open Dashboard</a></div>
+ <div class="text-center max-w-3xl mx-auto"><span class="px-3 py-1 rounded-full text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">AI Reliability Monitoring</span>
+ <h1 class="text-5xl md:text-6xl font-extrabold mt-5 leading-tight">Catch <span class="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">stale answers</span> before your users do.</h1>
+ <p class="text-slate-400 text-lg mt-5">FreshGuard AI compares AI-generated answers with your latest knowledge sources and flags outdated prices, versions, dates and policies — with an explainable freshness score.</p>
+ <div class="flex gap-3 justify-center mt-8"><a href="#/analyzer" class="btn btn-p px-6 py-3">Analyze an Answer</a><button class="btn btn-g px-6 py-3" onclick="seedDemo(false).then(()=>location.hash='#/simulate')">⚡ Run the live demo</button></div></div>
+ <div class="grid md:grid-cols-2 gap-4 mt-20"><div class="card p-6"><h3 class="font-bold text-red-300 mb-2">The problem</h3><p class="text-slate-400 text-sm">AI assistants confidently repeat information that was true last quarter. A price, an API version or a policy changes — and the chatbot keeps serving the old answer. Nobody notices until a customer complains.</p></div>
+ <div class="card p-6"><h3 class="font-bold text-emerald-300 mb-2">The solution</h3><p class="text-slate-400 text-sm">FreshGuard extracts claims, retrieves evidence from your current documents, runs deterministic contradiction checks and scores freshness — no black-box verdicts, no paid API required.</p></div></div>
+ <div class="grid md:grid-cols-3 gap-4 mt-6">${[["🧩","Claim extraction","Splits answers into atomic factual claims."],["⏱️","Temporal sensitivity","Prices & versions decay fast; history doesn't."],["🔍","Evidence retrieval","TF-IDF semantic search over your sources."],["⚖️","Contradiction engine","Deterministic price, version, date, number checks."],["📉","Explainable score","Temporal · contradiction · age components."],["⚡","Knowledge-update sim","Change a source, watch answers go stale."]].map(f=>`<div class="card p-5"><div class="text-2xl">${f[0]}</div><div class="font-bold mt-2">${f[1]}</div><div class="text-sm text-slate-400 mt-1">${f[2]}</div></div>`).join("")}</div>
+ <div class="card p-8 mt-6"><h3 class="font-bold text-xl mb-5">How it works</h3><div class="grid md:grid-cols-5 gap-3 text-center text-sm">${["Upload sources","Paste AI answer","Extract & classify claims","Compare with evidence","Score & explain"].map((s,i)=>`<div class="rounded-xl p-4 bg-slate-900/60 border border-slate-700/50"><div class="text-indigo-400 font-extrabold text-2xl">${i+1}</div>${s}</div>`).join("")}</div></div>
+ <div class="text-center mt-16 mb-8"><a href="#/dashboard" class="btn btn-p px-8 py-3 text-base">Get started →</a></div></div>`}
+
+async function dashboard(){const o=await api("/api/v1/analytics/overview");
+ const k=(l,v,c)=>`<div class="card p-4"><div class="text-xs text-slate-400">${l}</div><div class="text-3xl font-extrabold mt-1" style="color:${c}">${v}</div></div>`;
+ $("#view").innerHTML=wrap(head("Overview","Live metrics computed from the current in-memory state.",`<button class="btn btn-p" onclick="seedDemo()">🚀 Load Demo Data</button><button class="btn btn-g" onclick="location.hash='#/simulate'">⚡ Simulate Knowledge Update</button><button class="btn btn-g" onclick="resetDemo()">Reset</button>`)+
+ `<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">${k("Answers analyzed",o.total,"#e2e8f0")}${k("Fresh",o.fresh,"#10b981")}${k("Stale",o.stale,"#ef4444")}${k("Conflict",o.conflict,"#fb923c")}${k("Unverified",o.unverified,"#38bdf8")}${k("Avg freshness",fmt(o.avg_score),col(o.avg_score))}</div>
+ <div class="grid md:grid-cols-3 gap-4"><div class="card p-5"><h3 class="font-bold mb-3">Risk distribution</h3><canvas id="c1" height="200"></canvas></div>
+ <div class="card p-5 md:col-span-2"><h3 class="font-bold mb-3">Recent detections</h3>${o.recent.length?o.recent.map(r=>`<div class="flex items-center justify-between gap-3 py-2 border-b border-slate-800 text-sm cursor-pointer hover:bg-white/5 px-1 rounded" onclick='showReport("${r.id}")'><span class="truncate">${esc(r.answer)}</span><span class="flex gap-2 items-center shrink-0">${badge(r.status)}<b style="color:${col(r.overall_score)}">${fmt(r.overall_score)}</b></span></div>`).join(""):`<p class="text-slate-500 text-sm">No analyses yet. Load demo data or use the Analyzer.</p>`}</div></div>
+ <div class="card p-5 mt-4"><h3 class="font-bold mb-3">Source statistics</h3><div class="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">${[["Total",o.sources.total],["Ready",o.sources.ready],["Failed",o.sources.failed],["Current",o.sources.current],["Superseded",o.sources.superseded],["Chunks",o.sources.chunks]].map(x=>`<div><div class="text-slate-400 text-xs">${x[0]}</div><div class="text-xl font-bold">${x[1]}</div></div>`).join("")}</div></div>
+ <p class="text-xs text-slate-500 mt-4">Data is temporary demo state stored in server memory.</p>`);
+ const rk=o.risk_distribution;mk("#c1",{type:"doughnut",data:{labels:Object.keys(rk),datasets:[{data:Object.values(rk),backgroundColor:PAL,borderWidth:0}]},options:{plugins:{legend:{position:"bottom"}}}})}
+async function showReport(id){const d=await api("/api/v1/detections");const r=d.find(x=>x.id===id);if(!r)return;
+ openModal(`<div class="flex justify-between mb-3"><div><div class="text-xs text-slate-400">${esc(r.question)}</div><div class="font-bold">${esc(r.answer)}</div></div><button class="btn btn-g" onclick="closeModal()">✕</button></div>${report(r)}`)}
+
+let SRC=[];
+async function analyzer(){const [src,sc]=await Promise.all([api("/api/v1/sources"),api("/api/v1/demo/scenarios")]);SRC=src;
+ $("#view").innerHTML=wrap(head("Answer Analyzer","Paste an AI-generated answer and verify it against your knowledge sources.")+
+ `<div class="card p-4 mb-4"><div class="text-xs font-bold tracking-widest text-slate-500 mb-2">DEMO SCENARIOS (one click)</div><div class="flex flex-wrap gap-2">${sc.map(s=>`<button class="btn btn-g" onclick='runScenario(${JSON.stringify(s)})'>${s.id}. ${s.title} <span class="text-slate-500">→ ${s.expected}</span></button>`).join("")}</div></div>
+ <div class="grid lg:grid-cols-5 gap-4"><div class="card p-5 lg:col-span-3 space-y-3"><div><label class="text-xs text-slate-400">Question</label><input id="q" class="inp" placeholder="What is the current premium plan price?"></div>
+ <div><label class="text-xs text-slate-400">AI-generated answer *</label><textarea id="a" rows="5" class="inp" placeholder="Our Premium plan costs $99 per month."></textarea></div>
+ <div><label class="text-xs text-slate-400">Optional context (treated as an extra current source)</label><textarea id="ctx" rows="2" class="inp"></textarea></div>
+ <button id="go" class="btn btn-p w-full py-3" onclick="runAnalyze()">🔎 Analyze freshness</button></div>
+ <div class="card p-5 lg:col-span-2"><div class="text-sm font-bold mb-2">Sources <span class="text-slate-500 font-normal">(none selected = all)</span></div><div class="space-y-1.5 max-h-64 overflow-auto">${src.length?src.map(s=>`<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="sel" value="${s.id}"><span class="truncate">${esc(s.name)}</span><span class="ml-auto text-[10px] ${s.current?"text-emerald-300":"text-slate-500"}">${s.current?"current":"superseded"}</span></label>`).join(""):`<p class="text-slate-500 text-sm">No sources. <a class="text-indigo-300 underline" href="#/sources">Add some</a> or <a class="text-indigo-300 underline" href="#" onclick="seedDemo(false).then(analyzer);return false">load demo data</a>.</p>`}</div></div></div><div id="out" class="mt-6"></div>`)}
+async function runAnalyze(){const a=$("#a").value;if(!a.trim())return toast("Enter an AI answer first",1);
+ const btn=$("#go");btn.disabled=true;btn.textContent="Analyzing…";
+ const ids=[...document.querySelectorAll(".sel:checked")].map(x=>x.value);
+ try{const r=await post("/api/v1/analyze",{question:$("#q").value,answer:a,context:$("#ctx").value,source_ids:ids.length?ids:null});$("#out").innerHTML=`<div class="fade">${report(r)}</div>`}
+ catch(e){$("#out").innerHTML=`<div class="card p-4 text-red-300">${esc(e.message)}</div>`}finally{btn.disabled=false;btn.textContent="🔎 Analyze freshness"}}
+async function runScenario(s){try{if(!SRC.length)await post("/api/v1/demo/seed");await post("/api/v1/demo/conflict",{enabled:!!s.needs_conflict});
+ SRC=await api("/api/v1/sources");await analyzer();$("#q").value=s.question;$("#a").value=s.answer;await runAnalyze()}catch(e){toast(e.message,1)}}
+
+async function sources(){const l=await api("/api/v1/sources");
+ $("#view").innerHTML=wrap(head("Knowledge Sources","PDF, DOCX, TXT or a website URL. Text is extracted, normalized, chunked and hashed locally.",`<button class="btn btn-p" onclick="seedDemo()">🚀 Load Demo Data</button>`)+
+ `<div class="grid md:grid-cols-2 gap-4 mb-4"><label class="card p-6 text-center cursor-pointer hover:border-indigo-400/60 block" ondragover="event.preventDefault()" ondrop="event.preventDefault();upload(event.dataTransfer.files)"><div class="text-3xl">📤</div><div class="font-semibold mt-1">Drop files or click to upload</div><div class="text-xs text-slate-500">.pdf .docx .txt · max 10 MB · name versions like <code>pricing_v2.txt</code></div><input type="file" multiple accept=".pdf,.docx,.txt" class="hidden" onchange="upload(this.files)"></label>
+ <div class="card p-6"><div class="font-semibold mb-2">🌐 Add website URL</div><div class="flex gap-2"><input id="url" class="inp" placeholder="https://example.com/pricing"><button class="btn btn-p" onclick="addUrl()">Add</button></div></div></div>
+ <div class="card overflow-auto"><table class="w-full text-sm"><thead class="text-xs text-slate-400"><tr><th class="p-3 text-left">Name</th><th>Type</th><th>Status</th><th>Group/Ver</th><th>State</th><th>Chunks</th><th>Hash</th><th></th></tr></thead><tbody>
+ ${l.length?l.map(s=>`<tr class="border-t border-slate-800 text-center"><td class="p-3 text-left font-medium">${esc(s.name)}</td><td>${s.type}</td><td>${badge(s.status==="ready"?"FRESH":"STALE").replace(/FRESH|STALE/,s.status)}</td><td class="text-slate-400">${esc(s.group)} · v${s.version}</td><td>${s.current?'<span class="text-emerald-300">current</span>':'<span class="text-slate-500">superseded</span>'}</td><td>${s.chunk_count}</td><td class="font-mono text-xs text-slate-500">${(s.hash||"").slice(0,10)}</td>
+ <td class="p-2 whitespace-nowrap"><button class="btn btn-g !py-1" onclick="viewSrc('${s.id}')">View</button> <button class="btn btn-g !py-1" onclick="reproc('${s.id}')">↻</button> <button class="btn btn-g !py-1 text-red-300" onclick="delSrc('${s.id}')">✕</button></td></tr>`).join(""):`<tr><td colspan="8" class="p-8 text-center text-slate-500">No sources yet.</td></tr>`}</tbody></table></div>`)}
+async function upload(files){for(const f of files){const fd=new FormData();fd.append("file",f);try{await api("/api/v1/sources/upload",{method:"POST",body:fd});toast(`Uploaded ${f.name}`)}catch(e){toast(`${f.name}: ${e.message}`,1)}}sources()}
+async function addUrl(){const u=$("#url").value.trim();if(!u)return;try{await post("/api/v1/sources/url",{url:u});toast("URL ingested");sources()}catch(e){toast(e.message,1)}}
+async function viewSrc(id){const s=await api("/api/v1/sources/"+id);openModal(`<div class="flex justify-between mb-3"><div><div class="font-bold">${esc(s.name)}</div><div class="text-xs text-slate-400">${s.chunk_count} chunks · ${s.char_count} chars · sha256 ${s.hash.slice(0,16)}…</div></div><button class="btn btn-g" onclick="closeModal()">✕</button></div><pre class="text-sm bg-slate-950/70 p-4 rounded-xl max-h-[60vh] overflow-auto">${esc(s.text)}</pre>`)}
+async function reproc(id){try{await post(`/api/v1/sources/${id}/reprocess`);toast("Reprocessed");sources()}catch(e){toast(e.message,1)}}
+async function delSrc(id){try{await api("/api/v1/sources/"+id,{method:"DELETE"});toast("Removed");sources()}catch(e){toast(e.message,1)}}
+
+async function history(){const d=await api("/api/v1/detections");
+ $("#view").innerHTML=wrap(head("Detection History","Every analysis from this session.")+`<div class="card overflow-auto"><table class="w-full text-sm"><thead class="text-xs text-slate-400"><tr><th class="p-3 text-left">Answer</th><th>Status</th><th>Classification</th><th>Score</th><th>Time</th></tr></thead><tbody>
+ ${d.length?d.map(r=>`<tr class="border-t border-slate-800 text-center cursor-pointer hover:bg-white/5" onclick="showReport('${r.id}')"><td class="p-3 text-left max-w-md truncate">${esc(r.answer)}</td><td>${badge(r.status)}</td><td>${badge(r.band)}</td><td class="font-bold" style="color:${col(r.overall_score)}">${fmt(r.overall_score)}</td><td class="text-slate-400 text-xs">${when(r.created_at)}</td></tr>`).join(""):`<tr><td colspan="5" class="p-8 text-center text-slate-500">Nothing analyzed yet.</td></tr>`}</tbody></table></div>`)}
+
+async function analytics(){const o=await api("/api/v1/analytics/overview");
+ $("#view").innerHTML=wrap(head("Analytics","Computed from this session's analyses.")+`<div class="grid md:grid-cols-2 gap-4"><div class="card p-5"><h3 class="font-bold mb-3">Freshness classification</h3><canvas id="a1" height="200"></canvas></div><div class="card p-5"><h3 class="font-bold mb-3">Risk levels</h3><canvas id="a2" height="200"></canvas></div><div class="card p-5"><h3 class="font-bold mb-3">Freshness trend</h3><canvas id="a3" height="200"></canvas></div><div class="card p-5"><h3 class="font-bold mb-3">Claim categories</h3><canvas id="a4" height="200"></canvas></div></div>`);
+ const bd=o.band_distribution,rk=o.risk_distribution,cc=o.category_counts;
+ mk("#a1",{type:"bar",data:{labels:Object.keys(bd),datasets:[{data:Object.values(bd),backgroundColor:PAL,borderRadius:8}]},options:{plugins:{legend:{display:false}}}});
+ mk("#a2",{type:"doughnut",data:{labels:Object.keys(rk),datasets:[{data:Object.values(rk),backgroundColor:PAL,borderWidth:0}]},options:{plugins:{legend:{position:"bottom"}}}});
+ mk("#a3",{type:"line",data:{labels:o.trend.map((_,i)=>"#"+(i+1)),datasets:[{data:o.trend.map(t=>t.score),borderColor:"#8b5cf6",backgroundColor:"rgba(139,92,246,.2)",fill:true,tension:.35}]},options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:100}}}});
+ mk("#a4",{type:"bar",data:{labels:Object.keys(cc),datasets:[{data:Object.values(cc),backgroundColor:"#3b82f6",borderRadius:8}]},options:{indexAxis:"y",plugins:{legend:{display:false}}}})}
+
+async function settings(){const s=await api("/api/v1/settings");const w=s.weights,t=s.thresholds;
+ const f=(id,l,v,step)=>`<div><label class="text-xs text-slate-400">${l}</label><input id="${id}" type="number" step="${step}" value="${v}" class="inp"></div>`;
+ $("#view").innerHTML=wrap(head("Settings","Scoring weights and thresholds apply to new analyses (temporary, in-memory).")+`<div class="grid md:grid-cols-2 gap-4"><div class="card p-5"><h3 class="font-bold mb-1">Scoring weights</h3><p class="text-xs text-slate-500 mb-3">Freshness = 100 − (wT·Temporal + wC·Contradiction + wE·Age). Must sum to 1.</p><div class="grid grid-cols-3 gap-3">${f("wt","Temporal",w.temporal,.05)}${f("wc","Contradiction",w.contradiction,.05)}${f("wa","Age",w.age,.05)}</div>
+ <h3 class="font-bold mt-5 mb-3">Thresholds</h3><div class="grid grid-cols-3 gap-3">${f("tf","Fresh ≥",t.fresh,1)}${f("tr","Review ≥",t.review,1)}${f("ts","Stale ≥",t.stale,1)}</div><button class="btn btn-p mt-4" onclick="saveSettings()">Save</button></div>
+ <div class="card p-5"><h3 class="font-bold mb-2">Optional LLM</h3><p class="text-sm text-slate-300">Status: ${s.llm.configured?'<span class="text-emerald-300">configured</span>':'<span class="text-slate-400">not configured — deterministic fallback active</span>'}</p><p class="text-xs text-slate-500 mt-2">Model: ${esc(s.llm.model)}<br>Base URL: ${esc(s.llm.base_url)}</p><p class="text-xs text-slate-500 mt-3">Credentials are read from server environment variables only (<code>LLM_API_KEY</code>, <code>LLM_BASE_URL</code>, <code>LLM_MODEL</code>) and never sent to the browser. The LLM only rewrites the summary; all detection stays deterministic.</p></div></div>`)}
+async function saveSettings(){const n=id=>parseFloat($("#"+id).value);try{await api("/api/v1/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({weights:{temporal:n("wt"),contradiction:n("wc"),age:n("wa")},thresholds:{fresh:n("tf"),review:n("tr"),stale:n("ts")}})});toast("Settings saved")}catch(e){toast(e.message,1)}}
+
+async function simulate(){
+ $("#view").innerHTML=wrap(head("Simulate Knowledge Update","Old source → new source → change detection → claim revalidation → stale alerts. Everything below is computed from real content.",`<button class="btn btn-p" onclick="simulate()">▶ Run again</button>`)+`<div id="sim" class="card p-10 text-center text-slate-400">Running simulation…</div>`);
+ let d;try{d=await post("/api/v1/demo/simulate-update")}catch(e){$("#sim").innerHTML=`<span class="text-red-300">${esc(e.message)}</span>`;return}
+ const S=d.summary;
+ const steps=[
+  ["OLD SOURCE","📄",d.changes.map(c=>`<div class="font-mono text-xs">${esc(c.old_name)}<br><span class="text-slate-500">${c.old_hash.slice(0,12)}</span></div>`).join("")],
+  ["NEW SOURCE","📄",d.changes.map(c=>`<div class="font-mono text-xs">${esc(c.new_name)}<br><span class="text-slate-500">${c.new_hash.slice(0,12)}</span></div>`).join("")],
+  ["CHANGE DETECTION","🧬",`<b>${S.documents_changed}</b> docs changed · <b>${S.facts_changed}</b> facts changed`],
+  ["CLAIM REVALIDATION","🔁",`<b>${S.answers_revalidated}</b> answers revalidated`],
+  ["STALE ANSWER ALERT","🚨",`<b class="text-red-300">${S.new_stale}</b> new stale alerts`]];
+ $("#sim").className="";$("#sim").innerHTML=`<div class="card p-6 mb-4"><div class="flex flex-col items-center gap-1">${steps.map((s,i)=>`<div class="step w-full max-w-md card p-4 text-center border-indigo-500/30" id="st${i}"><div class="text-2xl">${s[1]}</div><div class="text-xs font-bold tracking-widest text-indigo-300 mt-1">${s[0]}</div><div class="text-sm mt-2">${s[2]}</div></div>${i<4?'<div class="step text-2xl text-indigo-400" id="ar'+i+'">↓</div>':""}`).join("")}</div></div><div id="simres"></div>`;
+ steps.forEach((_,i)=>{setTimeout(()=>{$("#st"+i).classList.add("show");const a=$("#ar"+i);if(a)a.classList.add("show")},i*650)});
+ setTimeout(()=>{$("#simres").innerHTML=`<div class="card p-5 mb-4"><h3 class="font-bold mb-3">Changed facts</h3>${d.changes.flatMap(c=>c.changed_facts).map(f=>`<div class="grid md:grid-cols-2 gap-3 mb-2"><div class="rounded-xl p-3 bg-red-500/10 border border-red-500/25"><div class="text-[10px] text-red-300 font-bold">OLD</div>${esc(f.old_line)}</div><div class="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/25"><div class="text-[10px] text-emerald-300 font-bold">NEW</div>${esc(f.new_line)}</div></div>`).join("")||"<p class='text-slate-500 text-sm'>No fact changes.</p>"}</div>
+ ${d.alerts.length?`<div class="card p-5 mb-4 border-red-500/40"><h3 class="font-bold text-red-300 mb-2">🚨 Stale answer alerts</h3>${d.alerts.map(a=>`<p class="text-sm mb-1.5">${esc(a)}</p>`).join("")}</div>`:""}
+ <div class="card p-5"><h3 class="font-bold mb-3">Revalidated answers</h3>${d.revalidated.map(r=>`<div class="flex flex-wrap items-center justify-between gap-2 py-2.5 border-b border-slate-800 text-sm"><span class="max-w-md">${esc(r.answer)}</span><span class="flex items-center gap-2">${badge(r.before.status)} <span class="text-slate-500">→</span> ${badge(r.after.status)}<b style="color:${col(r.after.score)}">${fmt(r.after.score)}</b>${r.alert==="NEW_STALE"?'<span class="text-red-300 text-xs font-bold">ALERT</span>':r.alert==="RECOVERED"?'<span class="text-emerald-300 text-xs font-bold">FIXED</span>':""}</span></div>`).join("")}</div>`},steps.length*650)}
+
+/* ───── router ───── */
+const views={home,dashboard,analyzer,sources,history,analytics,settings,simulate};
+async function route(){charts.forEach(c=>c.destroy());charts=[];
+ const h=(location.hash||"#/home").slice(2)||"home";const v=views[h]||home;
+ $("#side").style.display=h==="home"?"none":"flex";document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("on",a.dataset.r===h));
+ $("#view").innerHTML=`<div class="p-10 text-slate-500">Loading…</div>`;
+ try{await v()}catch(e){$("#view").innerHTML=`<div class="p-10 text-red-300">${esc(e.message)}</div>`}}
+window.addEventListener("hashchange",route);route();
+</script>
+</body></html>
